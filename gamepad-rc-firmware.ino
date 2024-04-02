@@ -8,19 +8,64 @@
 #include <sbus.h>
 
 #define SBUS_INT_MAX 2047
+#define OutputSerial Serial2
+
+class ChannelBuffer
+{
+  static const uint8_t HEADER_SIZE = 1;
+  static const uint8_t FOOTER_SIZE = 1;
+  static const uint8_t NUM_CHNLS = 4;
+  static const uint8_t BUF_SIZE = HEADER_SIZE + FOOTER_SIZE + (sizeof(int16_t) * NUM_CHNLS);
+  static const uint8_t HEADER = 0;
+  static const uint8_t FOOTER = BUF_SIZE - 1;
+public:
+  ChannelBuffer()
+  {
+    buf_[HEADER] = 0x0F;
+    buf_[FOOTER] = 0x00;
+  }
+
+  void setChannel(const uint8_t chnl, int16_t value)
+  {
+    if (chnl >= NUM_CHNLS)
+    {
+      return;
+    }
+    // Offset by 1 since the header is first
+    const auto chnl_idx = (chnl * 2) + 1;
+    //
+    if (chnl_idx >= FOOTER - 1)
+    {
+      return;
+    }
+
+    // Little endian
+    buf_[chnl_idx] = (value & 0x00FF);
+    buf_[chnl_idx + 1] = (value >> 8) & 0x00FF;
+  }
+
+  const uint8_t* getBuf() const
+  {
+    return buf_;
+  }
+
+  const size_t getSize() const
+  {
+    return BUF_SIZE;
+  }
+private:
+  uint8_t buf_[BUF_SIZE];
+};
 
 //! The connected gamepad (only supports on at a time)
 GamepadPtr gamepad = nullptr;
-
-//! SBUS transmitter
-bfs::SbusTx sbus(&Serial1, 16, 17, false);
-//! SBUS data to transmit
-bfs::SbusData rc_data;
+//! The data buffer to store the channel data
+ChannelBuffer chnl_buffer_;
 
 // Arduino setup function. Runs in CPU 1
 void setup() {
   Serial.begin(115200);
-  sbus.Begin();
+  OutputSerial.begin(115200);
 
   // Setup the Bluepad32 callbacks
   BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
@@ -32,10 +77,9 @@ void loop() {
   BP32.update();
 
   if (gamepad && gamepad->isConnected()) {
-    processRcData(gamepad, rc_data);
+    processRcData(gamepad, chnl_buffer_);
 
-    sbus.data(rc_data);
-    sbus.Write();
+    OutputSerial.write(reinterpret_cast<const char*>(chnl_buffer_.getBuf()), chnl_buffer_.getSize());
   }
 
   // The main loop must have some kind of "yield to lower priority task" event.
@@ -48,16 +92,21 @@ void loop() {
   delay(150);
 }
 
-void processRcData(GamepadPtr gamepad, bfs::SbusData& rc_data)
+void processRcData(GamepadPtr gamepad, ChannelBuffer& rc_data)
 {
   // Pitch
-  rc_data.ch[0] = map_value(gamepad->axisY(), -511, 512, 0, SBUS_INT_MAX);
+  const auto chnl0 = map_value(gamepad->axisY(), -511, 512, 0, SBUS_INT_MAX);
   // roll
-  rc_data.ch[1] = map_value(gamepad->axisY(), -511, 512, 0, SBUS_INT_MAX);
+  const auto chnl1 = map_value(gamepad->axisY(), -511, 512, 0, SBUS_INT_MAX);
   // Yaw
-  rc_data.ch[2] = map_value(gamepad->axisRX(), -511, 512, 0, SBUS_INT_MAX);
+  const auto chnl2 = map_value(gamepad->axisRX(), -511, 512, 0, SBUS_INT_MAX);
   // Raw vertical throttle
-  rc_data.ch[3] = map_value(gamepad->axisRY(), -511, 512, 0, SBUS_INT_MAX);
+  const auto chnl3 = map_value(gamepad->axisRY(), -511, 512, 0, SBUS_INT_MAX);
+
+  rc_data.setChannel(0, 0x0102);
+  rc_data.setChannel(1, 0x0304);
+  rc_data.setChannel(2, 0x0506);
+  rc_data.setChannel(3, 0x0708);
 }
 
 void onConnectedGamepad(GamepadPtr gp) {
