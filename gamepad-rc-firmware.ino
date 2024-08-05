@@ -5,10 +5,12 @@
 */
 
 #include <Bluepad32.h>
-#include <sbus.h>
+
 
 #define SBUS_INT_MAX 2047
-#define OutputSerial Serial2
+#define OutputSerial Serial
+#define CON_LED_PIN 34
+#define STAT_LED_PIN 35
 
 class ChannelBuffer
 {
@@ -62,10 +64,16 @@ GamepadPtr gamepad = nullptr;
 //! The data buffer to store the channel data
 ChannelBuffer chnl_buffer_;
 
+uint32_t last_led_time = 0;
+uint8_t led_state = 0;
+
 // Arduino setup function. Runs in CPU 1
 void setup() {
   Serial.begin(115200);
   OutputSerial.begin(115200);
+
+  // pinMode(CON_LED_PIN, OUTPUT);
+  // pinMode(STAT_LED_PIN, OUTPUT);
 
   // Setup the Bluepad32 callbacks
   BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
@@ -81,6 +89,17 @@ void loop() {
 
     OutputSerial.write(reinterpret_cast<const char*>(chnl_buffer_.getBuf()), chnl_buffer_.getSize());
   }
+  else
+  {
+    OutputSerial.write("text\r\n");
+  }
+
+  // const auto now = millis();
+  // if (now >= last_led_time + 500) {
+  //   digitalWrite(STAT_LED_PIN, led_state % 2);
+  //   last_led_time = now;
+  //   led_state++;
+  // }
 
   // The main loop must have some kind of "yield to lower priority task" event.
   // Otherwise the watchdog will get triggered.
@@ -103,10 +122,10 @@ void processRcData(GamepadPtr gamepad, ChannelBuffer& rc_data)
   // Raw vertical throttle
   const auto chnl3 = map_value(gamepad->axisRY(), -511, 512, 0, SBUS_INT_MAX);
 
-  rc_data.setChannel(0, 0x0102);
-  rc_data.setChannel(1, 0x0304);
-  rc_data.setChannel(2, 0x0506);
-  rc_data.setChannel(3, 0x0708);
+  rc_data.setChannel(0, chnl0);
+  rc_data.setChannel(1, chnl1);
+  rc_data.setChannel(2, chnl2);
+  rc_data.setChannel(3, chnl3);
 }
 
 void onConnectedGamepad(GamepadPtr gp) {
@@ -121,6 +140,9 @@ void onConnectedGamepad(GamepadPtr gp) {
 
     // Set the gamepad LED
     gamepad->setColorLED(0, 255, 0);
+
+    // Indicate the gamepad is connected
+    // digitalWrite(CON_LED_PIN, HIGH);
   }
 }
 
@@ -128,6 +150,9 @@ void onDisconnectedGamepad(GamepadPtr gp) {
   if (gamepad != nullptr && gamepad == gp)
   {
     gamepad = nullptr;
+
+    // Indicate the gamepad has disconnected
+    // digitalWrite(CON_LED_PIN, LOW);
   }
 }
 
