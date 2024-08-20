@@ -9,8 +9,8 @@
 
 #define SBUS_INT_MAX 2047
 #define OutputSerial Serial
-#define CON_LED_PIN 34
-#define STAT_LED_PIN 35
+#define CON_LED_PIN 25
+#define STAT_LED_PIN 26
 
 class ChannelBuffer
 {
@@ -65,15 +65,15 @@ GamepadPtr gamepad = nullptr;
 ChannelBuffer chnl_buffer_;
 
 uint32_t last_led_time = 0;
-uint8_t led_state = 0;
+bool led_state = false;
 
 // Arduino setup function. Runs in CPU 1
 void setup() {
   Serial.begin(115200);
   OutputSerial.begin(115200);
 
-  // pinMode(CON_LED_PIN, OUTPUT);
-  // pinMode(STAT_LED_PIN, OUTPUT);
+  pinMode(CON_LED_PIN, OUTPUT);
+  pinMode(STAT_LED_PIN, OUTPUT);
 
   // Setup the Bluepad32 callbacks
   BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
@@ -89,17 +89,13 @@ void loop() {
 
     OutputSerial.write(reinterpret_cast<const char*>(chnl_buffer_.getBuf()), chnl_buffer_.getSize());
   }
-  else
-  {
-    OutputSerial.write("text\r\n");
-  }
 
-  // const auto now = millis();
-  // if (now >= last_led_time + 500) {
-  //   digitalWrite(STAT_LED_PIN, led_state % 2);
-  //   last_led_time = now;
-  //   led_state++;
-  // }
+  const auto now = millis();
+  if (now >= last_led_time + 500) {
+    digitalWrite(STAT_LED_PIN, led_state);
+    last_led_time = now;
+    led_state = !led_state;
+  }
 
   // The main loop must have some kind of "yield to lower priority task" event.
   // Otherwise the watchdog will get triggered.
@@ -142,7 +138,7 @@ void onConnectedGamepad(GamepadPtr gp) {
     gamepad->setColorLED(0, 255, 0);
 
     // Indicate the gamepad is connected
-    // digitalWrite(CON_LED_PIN, HIGH);
+    digitalWrite(CON_LED_PIN, HIGH);
   }
 }
 
@@ -152,7 +148,7 @@ void onDisconnectedGamepad(GamepadPtr gp) {
     gamepad = nullptr;
 
     // Indicate the gamepad has disconnected
-    // digitalWrite(CON_LED_PIN, LOW);
+    digitalWrite(CON_LED_PIN, LOW);
   }
 }
 
