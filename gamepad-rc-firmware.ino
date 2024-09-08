@@ -6,8 +6,6 @@
 
 #include <Bluepad32.h>
 
-
-#define SBUS_INT_MAX 2047
 #define OutputSerial Serial
 #define CON_LED_PIN 25
 #define STAT_LED_PIN 26
@@ -109,14 +107,16 @@ void loop() {
 
 void processRcData(GamepadPtr gamepad, ChannelBuffer& rc_data)
 {
+  // Expected value range is [-511, 512]
+
   // Pitch
-  const auto chnl0 = map_value(gamepad->axisY(), -511, 512, 0, SBUS_INT_MAX);
-  // roll
-  const auto chnl1 = map_value(gamepad->axisX(), -511, 512, 0, SBUS_INT_MAX);
+  const auto chnl0 = static_cast<int16_t>(gamepad->axisY());
+  // Roll
+  const auto chnl1 = static_cast<int16_t>(gamepad->axisX());
   // Yaw
-  const auto chnl2 = map_value(gamepad->axisRX(), -511, 512, 0, SBUS_INT_MAX);
-  // Raw vertical throttle
-  const auto chnl3 = map_value(gamepad->axisRY(), -511, 512, 0, SBUS_INT_MAX);
+  const auto chnl2 = static_cast<int16_t>(gamepad->axisRX());
+  // Raw vertical velocity
+  const auto chnl3 = static_cast<int16_t>(gamepad->axisRY());
 
   rc_data.setChannel(0, chnl0);
   rc_data.setChannel(1, chnl1);
@@ -132,7 +132,6 @@ void onConnectedGamepad(GamepadPtr gp) {
                   gp->getModelName().c_str(), properties.vendor_id,
                   properties.product_id);
     gamepad = gp;
-    // TODO(nnarain): Set CON LED
 
     // Set the gamepad LED
     gamepad->setColorLED(0, 255, 0);
@@ -152,7 +151,7 @@ void onDisconnectedGamepad(GamepadPtr gp) {
   }
 }
 
-inline double map_value(int16_t x, int16_t in_min, int16_t in_max, int16_t out_min, int16_t out_max)
-{
-    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-}
+// inline double map_value(int16_t x, int16_t in_min, int16_t in_max, int16_t out_min, int16_t out_max)
+// {
+//     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+// }
