@@ -112,7 +112,7 @@ void processRcData(GamepadPtr gamepad, ChannelBuffer& rc_data)
   // Pitch
   const auto chnl0 = map_value(gamepad->axisY(), -511, 512, 0, SBUS_INT_MAX);
   // roll
-  const auto chnl1 = map_value(gamepad->axisY(), -511, 512, 0, SBUS_INT_MAX);
+  const auto chnl1 = map_value(gamepad->axisX(), -511, 512, 0, SBUS_INT_MAX);
   // Yaw
   const auto chnl2 = map_value(gamepad->axisRX(), -511, 512, 0, SBUS_INT_MAX);
   // Raw vertical throttle
