@@ -10,6 +10,8 @@
 #define CON_LED_PIN 25
 #define STAT_LED_PIN 26
 
+#define DEAD_MANS_SWITCH_ACTIVE_THRESHOLD 100
+
 class ChannelBuffer
 {
   static const uint8_t HEADER_SIZE = 1;
@@ -65,6 +67,8 @@ ChannelBuffer chnl_buffer_;
 uint32_t last_led_time = 0;
 bool led_state = false;
 
+bool dead_mans_switch_active = false;
+
 // Arduino setup function. Runs in CPU 1
 void setup() {
   Serial.begin(115200);
@@ -85,7 +89,12 @@ void loop() {
   if (gamepad && gamepad->isConnected()) {
     processRcData(gamepad, chnl_buffer_);
 
-    OutputSerial.write(reinterpret_cast<const char*>(chnl_buffer_.getBuf()), chnl_buffer_.getSize());
+    // Only send data if the dead man's switch is active
+    // It will be up to the receiving device to properly handle how to fail safe
+    if (dead_mans_switch_active)
+    {
+      OutputSerial.write(reinterpret_cast<const char*>(chnl_buffer_.getBuf()), chnl_buffer_.getSize());
+    }
   }
 
   const auto now = millis();
@@ -117,6 +126,11 @@ void processRcData(GamepadPtr gamepad, ChannelBuffer& rc_data)
   const auto chnl2 = static_cast<int16_t>(gamepad->axisRX());
   // Raw vertical velocity
   const auto chnl3 = static_cast<int16_t>(gamepad->axisRY());
+
+  // Use the left trigger as the dead man's switch
+  const auto dead_mans_switch_raw = gamepad->brake();
+  // Determine if the switch is pressed
+  dead_mans_switch_active = abs32(dead_mans_switch_raw) > DEAD_MANS_SWITCH_ACTIVE_THRESHOLD;
 
   rc_data.setChannel(0, chnl0);
   rc_data.setChannel(1, chnl1);
@@ -150,8 +164,3 @@ void onDisconnectedGamepad(GamepadPtr gp) {
     digitalWrite(CON_LED_PIN, LOW);
   }
 }
-
-// inline double map_value(int16_t x, int16_t in_min, int16_t in_max, int16_t out_min, int16_t out_max)
-// {
-//     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-// }
